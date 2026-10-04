@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KEF LSX II LT Stand</title>
+<style>
+:root { --bg: #eceff1; --panel: #f7f8f9; --fg: #1a2026; --muted: #58646f; --line: #c6ced5; --accent: #2456c8; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111519; --panel: #181d22; --fg: #e6eaee; --muted: #93a0ab; --line: #2b343c; --accent: #7fa4ff; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: "Arial Narrow", system-ui, sans-serif; font-size: 16px; line-height: 1.45; }
+.wrap { max-width: 640px; margin-inline: auto; padding: 20px 16px 28px; display: flex; flex-direction: column; gap: 14px; }
+h1 { margin: 0; font-size: 1.5rem; }
+p { margin: 0; color: var(--muted); }
+a.card { display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; color: var(--fg); text-decoration: none; }
+a.card:hover, a.card:focus-visible { border-color: var(--accent); }
+a.card strong { display: block; color: var(--accent); }
+a.card span { color: var(--muted); font-size: 0.92rem; }
+</style>
+<div class="wrap">
+  <h1>KEF LSX II LT stand</h1>
+  <p>A 3D-printable stand that tilts the speaker 8° upward. Two designs, each with a 3D view and a model to slice.</p>
+  <a class="card" href="viewer_pad.html"><strong>Pad: 3D view</strong><span>Replica of KEF's P1 pad: round platform, one 1/4"-20 screw.</span></a>
+  <a class="card" href="kef_lsx_ii_lt_pad.stl" download><strong>Pad: STL</strong><span>146.7 × 167.5 mm, 245 cm³</span></a>
+  <a class="card" href="viewer.html"><strong>Wedge: 3D view</strong><span>Sloped block with a pocket the speaker sits in.</span></a>
+  <a class="card" href="kef_lsx_ii_lt_stand.stl" download><strong>Wedge: STL</strong><span>182 × 196 mm, 723 cm³</span></a>
+  <a class="card" href="https://github.com/chamberneezy/kef-stand"><strong>Source on GitHub</strong><span>Parametric generators, plan and print settings.</span></a>
+</div>

@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LSX II LT Pad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -51,6 +55,15 @@ h2 { margin: 6px 0 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.06em;
 ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 6px; }
 li { max-width: 68ch; }
 .note { color: var(--muted); font-size: 0.9rem; margin: 0; max-width: 68ch; }
+body { margin: 0; }
+@media (max-width: 600px) {
+  .wrap { padding-block: 12px 24px; gap: 12px; }
+  h1 { font-size: 1.35rem; }
+  .stage { height: clamp(280px, 52svh, 420px); }
+  .bar { flex-direction: column; align-items: stretch; }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); }
+  button { min-height: 44px; padding: 8px 6px; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -229,12 +242,12 @@ li { max-width: 68ch; }
     top:    { az: 0, el: 1.5, r: 640 },
     under:  { az: 0.6, el: -1.0, r: 520 }
   };
-  var dirty = true, tween = null;
+  var dirty = true, tween = null, fit = 1;  // fit: pulls the camera back on narrow (phone) stages
   function place() {
-    var ce = Math.cos(st.el);
+    var ce = Math.cos(st.el) * fit;
     camera.position.set(target.x + st.r * ce * Math.sin(st.az),
                         target.y - st.r * ce * Math.cos(st.az),
-                        target.z + st.r * Math.sin(st.el));
+                        target.z + st.r * fit * Math.sin(st.el));
     camera.lookAt(target);
   }
   function clampEl() { st.el = Math.max(-1.52, Math.min(1.52, st.el)); }
@@ -292,6 +305,7 @@ li { max-width: 68ch; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
+    fit = Math.max(1, 1.2 / camera.aspect);
     dirty = true;
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener("resize", resize);
