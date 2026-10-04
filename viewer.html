@@ -296,7 +296,7 @@ body { margin: 0; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    fit = Math.max(1, 1.2 / camera.aspect);
+    fit = Math.max(1, 1 / camera.aspect);
     dirty = true;
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener("resize", resize);

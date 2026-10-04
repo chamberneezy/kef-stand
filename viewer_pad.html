@@ -211,7 +211,7 @@ body { margin: 0; }
 
   // ---- screw mock-up: 1/4"-20 thread standing 7 mm above the inset disc
   var screw = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 12, 24),
-    new THREE.MeshStandardMaterial({ color: 0xc9ced3, roughness: 0.3, metalness: 0.9 }));
+    new THREE.MeshStandardMaterial({ color: 0xd5d9dd, roughness: 0.35, metalness: 0.25 }));
   screw.rotation.x = Math.PI / 2 - TILT;
   screw.position.set(W / 2, SCREW_Y + Math.sin(TILT), zd(SCREW_Y) - WELL + Math.cos(TILT));
   scene.add(screw);
@@ -305,7 +305,7 @@ body { margin: 0; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    fit = Math.max(1, 1.2 / camera.aspect);
+    fit = Math.max(1, 1 / camera.aspect);
     dirty = true;
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener("resize", resize);
