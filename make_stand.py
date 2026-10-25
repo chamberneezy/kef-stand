@@ -9,7 +9,8 @@ Axes (mm): X = width (left-right), Y = depth (0 = front, speaker faces -Y),
 
 Method: a 2D Delaunay triangulation of the footprint is used as a height-field.
 Every triangle gets a top height (sloped plane, lowered inside the pocket) and a
-bottom height (flat, raised in the screw counterbore and foot recesses). Vertical
+bottom height (flat, raised in the screw counterbore, foot recesses and the
+hollow cells under the top skin). Vertical
 walls are emitted wherever neighbouring triangles differ, so the mesh is
 watertight by construction.
 """
@@ -43,6 +44,15 @@ P = dict(
     foot_depth=1.2,
     foot_inset_x=22.0,
     foot_inset_y=22.0,
+    shell=5.0,          # solid outer wall around the hollow underside
+    rib=2.4,            # rib thickness between hollow cells (6 x 0.4 mm lines)
+    skin=3.0,           # solid material kept above each hollow cell
+    spine_wall=3.0,     # solid wall either side of the screw counterbore
+    pad_wall=3.0,       # solid ring around each foot recess
+    cells_x=2,          # hollow cells per side of the spine, left-right
+    cells_y=6,          # hollow cell rows, front-back (keeps bridges under ~30 mm)
+    cell_r=2.0,         # hollow cell corner radius
+    min_cell_h=2.0,     # cells shallower than this stay solid
     step=0.5,           # outline sampling distance
     fill=3.0,           # interior point spacing
 )
@@ -113,6 +123,30 @@ def stadium(cx, y0, y1, w, step):
     return _resample(poly, step)
 
 
+def hollow_cells(p=P):
+    """Underside cells: (cx, cy, w, h, corner radius, ceiling). Each ceiling is flat (bridges cleanly) and sits
+    `skin` below the lowest top-surface point over that cell, so it steps down towards the rear."""
+    W, D = p["W"], p["D"]
+    spine = p["cb_w"] / 2 + p["spine_wall"]
+    x_spans = [(p["shell"], W / 2 - spine), (W / 2 + spine, W - p["shell"])]
+    y0, y1 = p["shell"], D - p["shell"]
+    ch = (y1 - y0 - (p["cells_y"] - 1) * p["rib"]) / p["cells_y"]
+    cells = []
+    for side, (xa, xb) in enumerate(x_spans):
+        cw = (xb - xa - (p["cells_x"] - 1) * p["rib"]) / p["cells_x"]
+        for i in range(p["cells_x"]):
+            cx = xa + cw / 2 + i * (cw + p["rib"])
+            for j in range(p["cells_y"]):
+                cy = y0 + ch / 2 + j * (ch + p["rib"])
+                ceil = zs(cy + ch / 2, p) - p["pocket_depth"] - p["skin"]
+                # cells at the outer corners follow the corner radius so the shell stays even
+                outer = i == (0 if side == 0 else p["cells_x"] - 1) and j in (0, p["cells_y"] - 1)
+                r = max(p["R"] - p["shell"], p["cell_r"]) if outer else p["cell_r"]
+                if ceil >= p["min_cell_h"]:
+                    cells.append((cx, cy, cw, ch, r, ceil))
+    return cells
+
+
 # ------------------------------------------------------------------ build mesh
 def build(p=P):
     W, D, st = p["W"], p["D"], p["step"]
@@ -124,10 +158,14 @@ def build(p=P):
     fx, fy = p["foot_inset_x"], p["foot_inset_y"]
     feet_polys = [circle(x, y, p["foot_d"], st)
                   for x in (fx, W - fx) for y in (fy, D - fy)]
+    pad_polys = [circle(x, y, p["foot_d"] + 2 * p["pad_wall"], st)
+                 for x in (fx, W - fx) for y in (fy, D - fy)]
+    cells = hollow_cells(p)
+    cell_polys = [rrect(cx, cy, cw, ch, r, st) for cx, cy, cw, ch, r, _ in cells]
 
     rings = [rrect(W / 2, D / 2, W - 2 * d, D - 2 * d, max(p["R"] - d, 1.0), 0.7)
              for d in (p["fillet"] * f for f in (0.07, 0.17, 0.3, 0.45, 0.62, 0.8, 1.0))] if p["fillet"] > 0 else []
-    outlines = [foot_poly, pocket_poly, slot_poly, cb_poly] + feet_polys + rings
+    outlines = [foot_poly, pocket_poly, slot_poly, cb_poly] + feet_polys + pad_polys + cell_polys + rings
     pts = np.vstack(outlines)
 
     # interior fill points, kept away from outlines
@@ -158,6 +196,11 @@ def build(p=P):
     for fp in feet_polys:
         in_foot |= MPath(fp).contains_points(cen)
     bot = np.where(in_cb, p["cb_depth"], np.where(in_foot, p["foot_depth"], 0.0))
+    in_pad = np.zeros(len(cen), bool)
+    for pp in pad_polys:
+        in_pad |= MPath(pp).contains_points(cen)
+    for cp, (*_, ceil) in zip(cell_polys, cells):
+        bot[MPath(cp).contains_points(cen) & ~in_pad] = ceil
     pk = in_pocket.astype(float)
 
     def top_z(i, t):  # vertex index i, triangle t
