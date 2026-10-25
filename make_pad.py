@@ -21,7 +21,7 @@ import numpy as np
 from matplotlib.path import Path as MPath
 from scipy.spatial import Delaunay, cKDTree
 
-from make_stand import check, circle, edge_drop, rrect, stadium, write_stl
+from make_stand import check, circle, edge_drop, inset, rrect, stadium, write_stl
 
 # ------------------------------------------------------------------ parameters
 P = dict(
@@ -139,8 +139,8 @@ def build(p=P):
     cells = hollow_cells(p)
     cell_polys = [rrect(x, y, w, h, p["cell_r"], st) for x, y, w, h, _ in cells]
 
-    rings = [rrect(W / 2, D / 2, W - 2 * d, D - 2 * d, max(p["R"] - d, 1.0), 0.7)
-             for d in (p["fillet"] * f for f in (0.07, 0.17, 0.3, 0.45, 0.62, 0.8, 1.0))] if p["fillet"] > 0 else []
+    rings = [inset(foot_poly, p["fillet"] * f)
+             for f in (0.07, 0.17, 0.3, 0.45, 0.62, 0.8, 1.0)] if p["fillet"] > 0 else []
     outlines = [foot_poly, disc_poly, well_poly, slot_poly, cb_poly, cbk_poly] + feet_polys + pad_polys + cell_polys + rings
     pts = np.vstack(outlines)
 

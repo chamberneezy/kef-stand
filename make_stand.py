@@ -102,6 +102,14 @@ def rrect(cx, cy, w, h, r, step):
     return _resample(poly, step)
 
 
+def inset(poly, d):
+    """Offset a closed CCW outline inwards by d, point for point. The fillet rings then line up
+    with the outline, so the rounded edge triangulates into a clean strip instead of slivers."""
+    tng = np.roll(poly, -1, axis=0) - np.roll(poly, 1, axis=0)
+    tng /= np.linalg.norm(tng, axis=1)[:, None]
+    return poly + d * np.c_[-tng[:, 1], tng[:, 0]]
+
+
 def circle(cx, cy, d, step):
     n = max(24, int(math.ceil(math.pi * d / step)))
     return np.array([(cx + d / 2 * math.cos(2 * math.pi * k / n),
@@ -163,8 +171,8 @@ def build(p=P):
     cells = hollow_cells(p)
     cell_polys = [rrect(cx, cy, cw, ch, r, st) for cx, cy, cw, ch, r, _ in cells]
 
-    rings = [rrect(W / 2, D / 2, W - 2 * d, D - 2 * d, max(p["R"] - d, 1.0), 0.7)
-             for d in (p["fillet"] * f for f in (0.07, 0.17, 0.3, 0.45, 0.62, 0.8, 1.0))] if p["fillet"] > 0 else []
+    rings = [inset(foot_poly, p["fillet"] * f)
+             for f in (0.07, 0.17, 0.3, 0.45, 0.62, 0.8, 1.0)] if p["fillet"] > 0 else []
     outlines = [foot_poly, pocket_poly, slot_poly, cb_poly] + feet_polys + pad_polys + cell_polys + rings
     pts = np.vstack(outlines)
 
