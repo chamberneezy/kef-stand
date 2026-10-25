@@ -10,7 +10,8 @@ Writes kef_lsx_ii_lt_pad.stl next to this script and prints a report.
 Axes and method are the same as make_stand.py (height-field over a 2D Delaunay
 triangulation). Differences: the top is a smooth per-vertex surface whose only
 step is the inset disc, and the counterbore ceiling is a sloped plane parallel to
-the platform, so the screw head seats square to the tilted screw.
+the platform, so the screw head seats square to the tilted screw. Under the thick
+platform and flare the underside is hollowed into a grid of flat-roofed cells.
 """
 import math
 import sys
@@ -44,6 +45,14 @@ P = dict(
     foot_depth=1.2,
     foot_inset_x=26.0,
     foot_inset_y=26.0,
+    shell=4.0,          # solid outer wall around the hollow underside
+    rib=2.4,            # rib thickness between hollow cells (6 x 0.4 mm lines)
+    cell=20.0,          # hollow cell size; small cells follow the curved top closely
+    cell_r=2.0,         # hollow cell corner radius
+    skin=3.0,           # solid material kept above each hollow cell
+    cb_wall=3.0,        # solid wall around the screw head recess
+    pad_wall=3.0,       # solid ring around each foot recess
+    min_cell_h=2.0,     # cells shallower than this stay solid
     step=0.5,           # outline sampling distance
     fill=2.0,           # interior point spacing
 )
@@ -82,6 +91,31 @@ def top_surface(x, y, p=P):
     return z - np.array([edge_drop(a, b, p) for a, b in zip(x, y)])
 
 
+def hollow_cells(p=P):
+    """Underside cells: (cx, cy, w, h, ceiling). Each ceiling is flat (bridges cleanly) and sits
+    `skin` below the lowest top-surface point over that cell, so the cells step down the flare."""
+    W, D, c, rib = p["W"], p["D"], p["cell"], p["rib"]
+    pitch = c + rib
+    n_x = int((W - 2 * p["shell"] + rib) // pitch)
+    n_y = int((D - 2 * p["shell"] + rib) // pitch)
+    x0 = W / 2 - (n_x * pitch - rib) / 2
+    y0 = D / 2 - (n_y * pitch - rib) / 2
+    s = np.linspace(0.0, c, 21)
+    cells = []
+    for i in range(n_x):
+        for j in range(n_y):
+            xa, ya = x0 + i * pitch, y0 + j * pitch
+            corners_x = np.array([xa, xa + c, xa, xa + c])
+            corners_y = np.array([ya, ya, ya + c, ya + c])
+            if sdf(corners_x, corners_y, p).max() > -p["shell"]:
+                continue  # keep the full shell under the rounded corners
+            gx, gy = np.meshgrid(xa + s, ya + s)
+            ceil = top_surface(gx.ravel(), gy.ravel(), p).min() - p["well_depth"] - p["skin"]
+            if ceil >= p["min_cell_h"]:
+                cells.append((xa + c / 2, ya + c / 2, c, c, ceil))
+    return cells
+
+
 # ------------------------------------------------------------------ build mesh
 def build(p=P):
     W, D, st = p["W"], p["D"], p["step"]
@@ -98,10 +132,16 @@ def build(p=P):
     fx, fy = p["foot_inset_x"], p["foot_inset_y"]
     feet_polys = [circle(x, y, p["foot_d"], st)
                   for x in (fx, W - fx) for y in (fy, D - fy)]
+    pad_polys = [circle(x, y, p["foot_d"] + 2 * p["pad_wall"], st)
+                 for x in (fx, W - fx) for y in (fy, D - fy)]
+    cbk_poly = stadium(cx, sy - zd(sy, p) * tan - p["cb_w"] / 2 - p["cb_wall"],
+                       sy - p["seat_t"] * tan + p["cb_w"] / 2 + p["cb_wall"], p["cb_w"] + 2 * p["cb_wall"], st)
+    cells = hollow_cells(p)
+    cell_polys = [rrect(x, y, w, h, p["cell_r"], st) for x, y, w, h, _ in cells]
 
     rings = [rrect(W / 2, D / 2, W - 2 * d, D - 2 * d, max(p["R"] - d, 1.0), 0.7)
              for d in (p["fillet"] * f for f in (0.07, 0.17, 0.3, 0.45, 0.62, 0.8, 1.0))] if p["fillet"] > 0 else []
-    outlines = [foot_poly, disc_poly, well_poly, slot_poly, cb_poly] + feet_polys + rings
+    outlines = [foot_poly, disc_poly, well_poly, slot_poly, cb_poly, cbk_poly] + feet_polys + pad_polys + cell_polys + rings
     pts = np.vstack(outlines)
 
     # interior fill points, kept away from outlines
@@ -131,6 +171,12 @@ def build(p=P):
     in_foot = np.zeros(len(cen), bool)
     for fp in feet_polys:
         in_foot |= MPath(fp).contains_points(cen)
+    solid = MPath(cbk_poly).contains_points(cen)
+    for pp in pad_polys:
+        solid |= MPath(pp).contains_points(cen)
+    cell_z = np.full(len(cen), np.nan)
+    for cp, (*_, ceil) in zip(cell_polys, cells):
+        cell_z[MPath(cp).contains_points(cen) & ~solid] = ceil
 
     top = top_surface(pts[:, 0], pts[:, 1], p)
     seat = np.array([zd(y, p) for y in pts[:, 1]]) - p["seat_t"]
@@ -139,7 +185,11 @@ def build(p=P):
         return top[i] - p["well_depth"] * in_well[t]
 
     def bot_z(i, t):
-        return seat[i] if in_cb[t] else (p["foot_depth"] if in_foot[t] else 0.0)
+        if in_cb[t]:
+            return seat[i]
+        if in_foot[t]:
+            return p["foot_depth"]
+        return 0.0 if np.isnan(cell_z[t]) else cell_z[t]
 
     tris = []
 
